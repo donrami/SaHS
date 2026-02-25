@@ -1,6 +1,9 @@
 import sys
 import os
 import json
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Add the parent directory so we can import pipeline modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
