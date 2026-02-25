@@ -1,6 +1,6 @@
-# tariffiq.io
+# SaHS
 
-tariffiq.io is a Harmonized System (HS) Code Classification and Search Engine tailored for ZATCA (Saudi Arabia) customs procedures. It aims to streamline cross-border trade, logistics, and customs clearance by providing accurate, multilingual HS Code lookups and automated classification of commercial invoices.
+SaHS is a Harmonized System (HS) Code Classification and Search Engine tailored for ZATCA (Saudi Arabia) customs procedures. It aims to streamline cross-border trade, logistics, and customs clearance by providing accurate, multilingual HS Code lookups and automated classification of commercial invoices.
 
 ## Features
 

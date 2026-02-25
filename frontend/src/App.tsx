@@ -426,8 +426,8 @@ export default function App() {
           <div className="header-brand">
             <div className="brand-icon"><Cpu size={20} /></div>
             <div>
-              <h1 className="brand-title">HS Classifier</h1>
-              <span className="brand-sub">Saudi ZATCA Tariff Intelligence</span>
+              <h1 className="brand-title">SaHS</h1>
+              <span className="brand-sub">Saudi HS Codes</span>
             </div>
           </div>
           <div className="header-actions">
@@ -619,7 +619,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        Saudi ZATCA Tariff HS Classifier · Powered by Gemini 2.5 Flash + ChromaDB
+        SaHS · Powered by Gemini 2.5 Flash + ChromaDB
       </footer>
 
       {/* Context Menu for Grid Cells */}
