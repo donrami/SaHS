@@ -24,6 +24,7 @@ TarrifIQ is a Harmonized System (HS) Code Classification and Search Engine tailo
 - Python 3.10+
 - Node.js & npm (for frontend)
 - A Google Gemini API Key
+- `Tariff.xlsx`: The main customs dataset. You must download this from the [ZATCA Tariff Search Page](https://eservices.zatca.gov.sa/sites/sc/en/tariff/Pages/TariffPages/TariffSearch.aspx) and place it in the project root.
 
 ### Backend Setup
 
@@ -69,4 +70,4 @@ TarrifIQ is a Harmonized System (HS) Code Classification and Search Engine tailo
 - Upload an Invoice CSV to map the entire document to the correct HS Codes.
 
 ## License
-MIT
+This project is licensed under the [GNU Affero General Public License v3.0 (AGPLv3)](LICENSE).
