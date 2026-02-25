@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AgGridReact } from 'ag-grid-react';
 import {
@@ -94,17 +94,49 @@ function DistanceBar({ value }: { value: number }) {
 }
 
 function HierarchyBreadcrumb({ path }: { path: string }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
   if (!path) return <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>;
   const segments = path.split(' > ');
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setTooltipPos({ top: e.clientY - 12, left: e.clientX });
+  };
+
   return (
-    <div className="hierarchy-breadcrumb" title={path}>
-      {segments.map((seg, i) => (
-        <span key={i} style={{ display: 'contents' }}>
-          {i > 0 && <span className="hierarchy-chevron">›</span>}
-          <span className="hierarchy-segment">{seg}</span>
-        </span>
-      ))}
-    </div>
+    <>
+      <div
+        className="hierarchy-breadcrumb"
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        {segments.map((seg, i) => (
+          <span key={i} style={{ display: 'contents' }}>
+            {i > 0 && <span className="hierarchy-chevron">›</span>}
+            <span className="hierarchy-segment">{seg}</span>
+          </span>
+        ))}
+      </div>
+      {showTooltip && createPortal(
+        <div
+          className="desc-tooltip"
+          style={{
+            position: 'fixed',
+            top: tooltipPos.top,
+            left: tooltipPos.left,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 10000,
+            pointerEvents: 'none'
+          }}
+        >
+          <div className="desc-tooltip-content">{path}</div>
+          <div className="desc-tooltip-arrow" />
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 
@@ -245,6 +277,48 @@ function ProcedureChip({ code }: { code: string }) {
   );
 }
 
+function DescriptionCell({ value }: { value: string }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  const clean = value ? String(value).replace(/[-:]/g, '').replace(/\s+/g, ' ').trim() : '';
+  if (!clean) return <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>;
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setTooltipPos({ top: e.clientY - 12, left: e.clientX });
+  };
+
+  return (
+    <>
+      <span
+        className="desc-cell-text"
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        {clean}
+      </span>
+      {showTooltip && createPortal(
+        <div
+          className="desc-tooltip"
+          style={{
+            position: 'fixed',
+            top: tooltipPos.top,
+            left: tooltipPos.left,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 10000,
+            pointerEvents: 'none'
+          }}
+        >
+          <div className="desc-tooltip-content">{clean}</div>
+          <div className="desc-tooltip-arrow" />
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 function ProceduresCell({ value }: { value: string }) {
   if (!value || value === 'nan') return <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>;
   const codes = value.split(',').map(c => c.trim()).filter(Boolean);
@@ -259,8 +333,14 @@ function ProceduresCell({ value }: { value: string }) {
 
 export default function App() {
   const [isLightMode, setIsLightMode] = useState(() => {
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      return window.matchMedia('(prefers-color-scheme: light)').matches;
+    if (typeof window !== 'undefined') {
+      const savedTheme = sessionStorage.getItem('theme-preference');
+      if (savedTheme) {
+        return savedTheme === 'light';
+      }
+      if (window.matchMedia) {
+        return window.matchMedia('(prefers-color-scheme: light)').matches;
+      }
     }
     return false;
   });
@@ -269,7 +349,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; value: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; value?: string; action: 'copy' | 'reset-layout'; openedAt: number } | null>(null);
+  const gridApiRef = useRef<any>(null);
 
   // Classify tab state
   const [rawInput, setRawInput] = useState(
@@ -291,8 +372,10 @@ export default function App() {
     const root = document.documentElement;
     if (isLightMode) {
       root.classList.add('theme-light');
+      sessionStorage.setItem('theme-preference', 'light');
     } else {
       root.classList.remove('theme-light');
+      sessionStorage.setItem('theme-preference', 'dark');
     }
   }, [isLightMode]);
 
@@ -375,7 +458,7 @@ export default function App() {
     },
     {
       field: 'english_description', headerName: 'English Description (EN)', flex: 2, minWidth: 200,
-      valueFormatter: (p: any) => cleanDesc(p.value)
+      cellRenderer: ({ value }: { value: string }) => <DescriptionCell value={value} />,
     },
     {
       field: 'arabic_description', headerName: 'Arabic Description (AR)', flex: 2, minWidth: 200,
@@ -392,7 +475,7 @@ export default function App() {
     },
     {
       field: 'desc_en', headerName: 'English Description', flex: 1.5, minWidth: 150,
-      valueFormatter: (p: any) => cleanDesc(p.value)
+      cellRenderer: ({ value }: { value: string }) => <DescriptionCell value={value} />,
     },
     {
       field: 'desc_ar', headerName: 'Arabic Description', flex: 1.5, minWidth: 150,
@@ -414,6 +497,7 @@ export default function App() {
     },
     {
       field: 'distance', headerName: 'Similarity Score', width: 160,
+      resizable: false,
       cellRenderer: ({ value }: { value: number }) => <DistanceBar value={value} />,
     },
   ];
@@ -427,7 +511,7 @@ export default function App() {
             <div className="brand-icon"><Cpu size={20} /></div>
             <div>
               <h1 className="brand-title">SaHS</h1>
-              <span className="brand-sub">Saudi HS Codes</span>
+              <span className="brand-sub">Saudi HS Code Intelligence</span>
             </div>
           </div>
           <div className="header-actions">
@@ -503,7 +587,13 @@ export default function App() {
                   <h2 className="card-title"><Hash size={16} /> Classification Results</h2>
                   <span className="card-hint">{results.length} items classified</span>
                 </div>
-                <div className="grid-wrap">
+                <div className="grid-wrap" onContextMenu={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.ag-header-cell-resize') || target.classList.contains('ag-header-cell-resize')) {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, action: 'reset-layout', openedAt: Date.now() });
+                  }
+                }}>
                   <AgGridReact
                     theme={isLightMode ? myThemeLight : myThemeDark}
                     rowData={results}
@@ -511,16 +601,59 @@ export default function App() {
                     domLayout="autoHeight"
                     defaultColDef={{ sortable: true, filter: true, resizable: true }}
                     preventDefaultOnContextMenu={true}
+                    onGridReady={(params) => { gridApiRef.current = params.api; }}
                     onCellContextMenu={(e) => {
                       if (e.event) {
                         e.event.preventDefault();
-                        setContextMenu({ x: (e.event as MouseEvent).clientX, y: (e.event as MouseEvent).clientY, value: e.value ? String(e.value) : '' });
+                        setContextMenu({ x: (e.event as MouseEvent).clientX, y: (e.event as MouseEvent).clientY, value: e.value ? String(e.value) : '', action: 'copy', openedAt: Date.now() });
                       }
                     }}
                   />
                 </div>
               </div>
             )}
+
+            {/* File Upload section moved here */}
+            <div className="card upload-card">
+              <div className="upload-icon"><Upload size={24} /></div>
+              <div>
+                <h3 className="upload-title">Bulk CSV Upload</h3>
+                <p className="upload-desc">Upload a CSV with an <code>item_description</code> column to classify thousands of invoice lines at once.</p>
+              </div>
+              <input
+                id="csv-upload"
+                type="file"
+                accept=".csv"
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  clearMessages();
+                  setLoading(true);
+                  const formData = new FormData();
+                  formData.append('file', f);
+                  try {
+                    const res = await fetch(`${API_BASE}/classify/csv`, { method: 'POST', body: formData });
+                    if (!res.ok) throw new Error((await res.json()).detail);
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'classified_output.csv';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    setSuccess('Bulk classification complete — your download started.');
+                  } catch (e: unknown) {
+                    setError(e instanceof Error ? e.message : 'Upload failed');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              />
+              <label htmlFor="csv-upload" className="btn btn-secondary" style={{ cursor: 'pointer' }}>
+                <Upload size={15} /> Upload CSV
+              </label>
+            </div>
           </>
         )}
 
@@ -552,9 +685,14 @@ export default function App() {
               <div className="card">
                 <div className="card-header">
                   <h2 className="card-title"><Hash size={16} /> Search Results</h2>
-                  <span className="card-hint">Lower distance = better match</span>
                 </div>
-                <div className="grid-wrap">
+                <div className="grid-wrap" onContextMenu={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.ag-header-cell-resize') || target.classList.contains('ag-header-cell-resize')) {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, action: 'reset-layout', openedAt: Date.now() });
+                  }
+                }}>
                   <AgGridReact
                     theme={isLightMode ? myThemeLight : myThemeDark}
                     rowData={searchResults}
@@ -562,10 +700,11 @@ export default function App() {
                     domLayout="autoHeight"
                     defaultColDef={{ sortable: true, filter: true, resizable: true }}
                     preventDefaultOnContextMenu={true}
+                    onGridReady={(params) => { gridApiRef.current = params.api; }}
                     onCellContextMenu={(e) => {
                       if (e.event) {
                         e.event.preventDefault();
-                        setContextMenu({ x: (e.event as MouseEvent).clientX, y: (e.event as MouseEvent).clientY, value: e.value ? String(e.value) : '' });
+                        setContextMenu({ x: (e.event as MouseEvent).clientX, y: (e.event as MouseEvent).clientY, value: e.value ? String(e.value) : '', action: 'copy', openedAt: Date.now() });
                       }
                     }}
                   />
@@ -574,48 +713,6 @@ export default function App() {
             )}
           </>
         )}
-
-        {/* File Upload section */}
-        <div className="card upload-card">
-          <div className="upload-icon"><Upload size={24} /></div>
-          <div>
-            <h3 className="upload-title">Bulk CSV Upload</h3>
-            <p className="upload-desc">Upload a CSV with an <code>item_description</code> column to classify thousands of invoice lines at once.</p>
-          </div>
-          <input
-            id="csv-upload"
-            type="file"
-            accept=".csv"
-            style={{ display: 'none' }}
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              clearMessages();
-              setLoading(true);
-              const formData = new FormData();
-              formData.append('file', f);
-              try {
-                const res = await fetch(`${API_BASE}/classify/csv`, { method: 'POST', body: formData });
-                if (!res.ok) throw new Error((await res.json()).detail);
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'classified_output.csv';
-                a.click();
-                URL.revokeObjectURL(url);
-                setSuccess('Bulk classification complete — your download started.');
-              } catch (e: unknown) {
-                setError(e instanceof Error ? e.message : 'Upload failed');
-              } finally {
-                setLoading(false);
-              }
-            }}
-          />
-          <label htmlFor="csv-upload" className="btn btn-secondary" style={{ cursor: 'pointer' }}>
-            <Upload size={15} /> Upload CSV
-          </label>
-        </div>
       </main>
 
       <footer className="footer">
@@ -654,15 +751,22 @@ export default function App() {
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            onClick={() => {
-              if (contextMenu.value) {
+            onPointerUp={(e) => {
+              if (e.button !== 0) return; // Explicitly only allow left-clicks
+
+              if (contextMenu.action === 'reset-layout') {
+                if (gridApiRef.current) {
+                  gridApiRef.current.resetColumnState();
+                }
+                // No status update message for column layout reset
+              } else if (contextMenu.action === 'copy' && contextMenu.value) {
                 navigator.clipboard.writeText(contextMenu.value);
                 setSuccess('Copied to clipboard');
               }
               setContextMenu(null);
             }}
           >
-            Copy cell contents
+            {contextMenu.action === 'reset-layout' ? 'Reset Column Layout' : 'Copy cell contents'}
           </button>
         </div>
       )}

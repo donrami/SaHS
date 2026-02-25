@@ -301,6 +301,10 @@ def step_c_generate_csv(mapped_data, output_filename="processed_invoice.csv"):
     """
     print(f"\n--- Step C: Generating Output CSV: {output_filename} ---")
     df = pd.DataFrame(mapped_data)
+    if "arabic_description" in df.columns:
+        df = df.drop(columns=["arabic_description"])
+    if "reasoning" in df.columns:
+        df = df.drop(columns=["reasoning"])
     # Ensure Arabic output exports properly using utf-8-sig
     df.to_csv(output_filename, index=False, encoding='utf-8-sig') 
     print(f"Successfully saved {len(df)} records to {output_filename}")
