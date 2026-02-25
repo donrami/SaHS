@@ -15,7 +15,8 @@ except ImportError:
     genai = None
 
 # 1. Initialize Vector Database connection
-DB_PATH = "./chroma_hs_db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "chroma_hs_db")
 COLLECTION_NAME = "saso_hs_codes_gemini"
 EXCEL_FILE = "Tariff.xlsx"
 
