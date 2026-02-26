@@ -1,4 +1,2 @@
 User-agent: *
 Allow: /
-
-Sitemap: https://sahs.vercel.app/sitemap.xml
