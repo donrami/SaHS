@@ -59,59 +59,57 @@ collection = client.get_or_create_collection(
 )
 
 def ingest_data():
-    print(f"Loading Excel file: {EXCEL_FILE}...")
-    # Adjust 'HS_CODE', 'DESC_EN', 'DESC_AR' to match your actual Excel column headers
-    df = pd.read_excel(EXCEL_FILE, dtype=str) 
+    print(f"Loading Excel file: {EXCEL_FILE} in chunks to save memory...")
     
-    # Rename columns based on actual dataset headers
+    current_count = collection.count()
+    print(f"Collection already has {current_count} documents.")
+    
+    # Read Excel, but we will process it iteratively to save memory
+    df = pd.read_excel(EXCEL_FILE, dtype=str) 
     df = df.rename(columns={
         'رمز النظام المنسق \n Harmonized Code': 'HS_CODE',
         'الصنف باللغة الانجليزية \n Item English Name': 'DESC_EN',
         'الصنف باللغة العربية \n Item Arabic Name': 'DESC_AR'
     })
-    
-    # Clean data: drop rows where essential fields are missing
     df = df.dropna(subset=['HS_CODE', 'DESC_EN']) 
     
-    documents = []
-    metadatas = []
-    ids = []
-    
-    current_count = collection.count()
-    print(f"Collection already has {current_count} documents. Skipping those...")
+    # Skip already ingested rows
     df = df.iloc[current_count:]
-    print(f"Remaining to ingest: {len(df)}")
+    total_remaining = len(df)
+    print(f"Remaining to ingest: {total_remaining}")
     
-    print("Preparing rows for vectorization. This might take a few minutes...")
+    if total_remaining == 0:
+        print("Nothing to ingest!")
+        return
+        
+    batch_size = 500  # Smaller batch size for Chromium/Gemini API memory footprint
     
-    for index, row in df.iterrows():
-        # The 'document' is what Chroma reads to find semantic meaning.
-        # We combine English and Arabic so it can be searched in either language.
-        combined_text = f"English: {row['DESC_EN']} | Arabic: {row.get('DESC_AR', '')}"
+    for i in range(0, total_remaining, batch_size):
+        chunk = df.iloc[i:i+batch_size]
+        documents = []
+        metadatas = []
+        ids = []
         
-        documents.append(combined_text)
-        
-        # Metadata is what we get back (the actual code and isolated text)
-        metadatas.append({
-            "hs_code": str(row['HS_CODE']),
-            "desc_en": str(row['DESC_EN']),
-            "desc_ar": str(row.get('DESC_AR', ''))
-        })
-        
-        # ID must be unique. The HS code itself is a good ID if there are no duplicates.
-        # Prefixing with index to avoid accidental identical HS Code collision overwriting
-        ids.append(f"{index}_{row['HS_CODE']}")
-
-    # Batch insert into ChromaDB (Max 5461 per batch usually, but Chroma handles chunking in newer versions)
-    # We slice it into chunks of 5000 just to be safe and avoid memory spikes
-    batch_size = 5000
-    for i in range(0, len(documents), batch_size):
-        print(f"Inserting batch {i} to {i+batch_size}...")
+        for index, row in chunk.iterrows():
+            combined_text = f"English: {row['DESC_EN']} | Arabic: {row.get('DESC_AR', '')}"
+            documents.append(combined_text)
+            
+            metadatas.append({
+                "hs_code": str(row['HS_CODE']),
+                "desc_en": str(row['DESC_EN']),
+                "desc_ar": str(row.get('DESC_AR', ''))
+            })
+            ids.append(f"{index}_{row['HS_CODE']}")
+            
+        print(f"Inserting batch {i} to {min(i+batch_size, total_remaining)} out of {total_remaining}...")
         collection.add(
-            documents=documents[i:i+batch_size],
-            metadatas=metadatas[i:i+batch_size],
-            ids=ids[i:i+batch_size]
+            documents=documents,
+            metadatas=metadatas,
+            ids=ids
         )
+        # Clear lists from memory explicitly
+        del documents, metadatas, ids
+        
     print("Ingestion complete! Database is ready.")
 
 def search_hs_code(query_text, top_k=5):
