@@ -69,9 +69,7 @@ SaHS is a Harmonized System (HS) Code Classification and Search Engine tailored 
 SaHS now provides an **Open API** for external integrations.
 
 - **Production API**: `https://sahs-c7oy.onrender.com:8000`
-- **Interactive Documentation**:
-  - [Swagger UI](https://sahs-c7oy.onrender.com/docs)
-  - [ReDoc](https://sahs-c7oy.onrender.com/redoc)
+- **Documentation**: [Swagger UI](https://sahs-c7oy.onrender.com/docs)  
 - **API Guide**: See [README_API.md](README_API.md) for detailed implementation instructions and cURL examples.
 
 ## Usage
