@@ -6,6 +6,7 @@ load_dotenv()
 import json
 import pandas as pd
 import chromadb
+import time
 from chromadb.utils import embedding_functions
 
 # For our LLM agent
@@ -26,7 +27,6 @@ class GeminiEmbeddingFunction(embedding_functions.EmbeddingFunction):
         self.client = genai.Client(api_key=api_key)
         
     def __call__(self, input: list) -> list:
-        import time
         embeddings = []
         batch_size = 100
         for i in range(0, len(input), batch_size):
@@ -175,14 +175,57 @@ except Exception as e:
     print(f"Warning: Could not build HS lookup: {e}")
 
 
+def _expand_query(query_text: str) -> str:
+    """
+    Use Gemini to expand a short or informal query into a richer, more formal
+    phrasing that is more likely to match HS code / tariff terminology.
+
+    For example:  "phone"  →  "telephone phone mobile cellular handset device"
+
+    Returns the expanded query string, or the original if expansion fails.
+    """
+    # Reuse the module-level client from GeminiEmbeddingFunction — never
+    # allocate a new Client (and its underlying HTTP connection pool) per call.
+    if collection is None or not hasattr(gemini_ef, 'client'):
+        return query_text
+    try:
+        prompt = (
+            "You are a trade/customs terminology expert. "
+            "A user is searching a Saudi HS tariff code database. "
+            "The database uses formal English trade terminology (e.g. 'telephone', not 'phone'). "
+            "Expand the following query into a short list of formal synonyms and related trade terms "
+            "so the semantic search finds the best matches. "
+            "Output ONLY the expanded query as a single line of space-separated terms — no punctuation, no explanation.\n"
+            f"Query: {query_text}"
+        )
+        resp = gemini_ef.client.models.generate_content(
+            model='gemini-2.5-flash-lite',
+            contents=prompt,
+        )
+        expanded = resp.text.strip().replace('\n', ' ')
+        print(f"[query expansion] '{query_text}' → '{expanded}'")
+        return expanded if expanded else query_text
+    except Exception as e:
+        print(f"[query expansion] failed, using original query: {e}")
+        return query_text
+
+
 def search_hs_code(query_text, top_k=5):
-    """Search ChromaDB for potential HS codes, enriched with hierarchy metadata."""
+    """Search ChromaDB for potential HS codes, enriched with hierarchy metadata.
+
+    Short or informal queries are automatically expanded via Gemini before
+    embedding so that vocabulary mismatches (e.g. 'phone' vs 'telephone')
+    do not prevent relevant results from being found.
+    """
     if collection is None:
         print("ChromaDB collection not initialized. Cannot perform search.")
         return []
-    
+
+    # Expand the query to bridge informal ↔ formal vocabulary gaps.
+    effective_query = _expand_query(query_text)
+
     results = collection.query(
-        query_texts=[query_text],
+        query_texts=[effective_query],
         n_results=top_k
     )
     
@@ -259,7 +302,7 @@ def step_b_translate_and_map(extracted_items, gemini_client=None):
             
             try:
                 response = gemini_client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gemini-2.5-flash-lite',
                     contents=prompt,
                     config={
                         'response_mime_type': 'application/json',

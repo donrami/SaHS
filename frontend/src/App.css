@@ -18,7 +18,7 @@
 .header-inner {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 14px 24px;
+  padding: 2px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -26,8 +26,17 @@
 
 .header-brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 0;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.header-brand:hover {
+  opacity: 0.85;
 }
 
 .brand-icon {
@@ -42,6 +51,23 @@
   color: var(--success);
 }
 
+.brand-logo {
+  height: 60px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+  /* Crop built-in PNG whitespace so the header stays compact */
+  margin-top: 6px;
+  margin-bottom: 0;
+  /* Invert in dark mode so black text becomes white */
+  filter: invert(1) hue-rotate(180deg);
+}
+
+:root.theme-light .brand-logo {
+  filter: none;
+}
+
 .brand-title {
   font-size: 16px;
   font-weight: 700;
@@ -51,8 +77,13 @@
 
 .brand-sub {
   font-size: 11px;
-  color: var(--text-muted);
+  color: #ffffff;
   letter-spacing: 0.02em;
+  padding-bottom: 10px;
+}
+
+:root.theme-light .brand-sub {
+  color: #000000;
 }
 
 .header-pills {
@@ -651,12 +682,39 @@
 
 /* Footer */
 .footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   text-align: center;
   font-size: 11px;
   color: var(--text-muted);
   padding: 16px 24px;
   border-top: 1px solid var(--border);
   margin-top: auto;
+}
+
+.footer-github-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font);
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 10px 3px 7px;
+  text-decoration: none;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1;
+}
+
+.footer-github-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background: var(--bg-secondary);
 }
 
 /* code tags */
@@ -667,4 +725,31 @@ code {
   padding: 1px 5px;
   border-radius: 4px;
   color: var(--text-primary);
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: tooltip-fade-in 0.15s ease-out;
+}
+
+.modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
 }

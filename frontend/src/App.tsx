@@ -95,13 +95,16 @@ function DistanceBar({ value }: { value: number }) {
 
 function HierarchyBreadcrumb({ path }: { path: string }) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   if (!path) return <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>;
   const segments = path.split(' > ');
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    setTooltipPos({ top: e.clientY - 12, left: e.clientX });
+    if (tooltipRef.current) {
+      tooltipRef.current.style.top = `${e.clientY - 12}px`;
+      tooltipRef.current.style.left = `${e.clientX}px`;
+    }
   };
 
   return (
@@ -121,11 +124,12 @@ function HierarchyBreadcrumb({ path }: { path: string }) {
       </div>
       {showTooltip && createPortal(
         <div
+          ref={tooltipRef}
           className="desc-tooltip"
           style={{
             position: 'fixed',
-            top: tooltipPos.top,
-            left: tooltipPos.left,
+            top: 0,
+            left: 0,
             transform: 'translate(-50%, -100%)',
             zIndex: 10000,
             pointerEvents: 'none'
@@ -232,14 +236,17 @@ const PROCEDURE_DATA: Record<string, { ar: string; en: string }> = {
 
 function ProcedureChip({ code }: { code: string }) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const data = PROCEDURE_DATA[code];
   const enLabel = data?.en || `Customs Procedure ${code}`;
   const arText = data?.ar || '';
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    setTooltipPos({ top: e.clientY - 12, left: e.clientX });
+    if (tooltipRef.current) {
+      tooltipRef.current.style.top = `${e.clientY - 12}px`;
+      tooltipRef.current.style.left = `${e.clientX}px`;
+    }
   };
 
   return (
@@ -254,11 +261,12 @@ function ProcedureChip({ code }: { code: string }) {
       </span>
       {showTooltip && createPortal(
         <div
+          ref={tooltipRef}
           className="procedure-tooltip"
           style={{
             position: 'fixed',
-            top: tooltipPos.top,
-            left: tooltipPos.left,
+            top: 0,
+            left: 0,
             transform: 'translate(-50%, -100%)',
             zIndex: 10000,
             pointerEvents: 'none'
@@ -279,13 +287,16 @@ function ProcedureChip({ code }: { code: string }) {
 
 function DescriptionCell({ value }: { value: string }) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
-  const clean = value ? String(value).replace(/[-:]/g, '').replace(/\s+/g, ' ').trim() : '';
+  const clean = value ? String(value).replace(/[-:]/g, '').replace(/\s+/g, ' ').trim().replace(/^(.)/, c => c.toUpperCase()) : '';
   if (!clean) return <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>;
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    setTooltipPos({ top: e.clientY - 12, left: e.clientX });
+    if (tooltipRef.current) {
+      tooltipRef.current.style.top = `${e.clientY - 12}px`;
+      tooltipRef.current.style.left = `${e.clientX}px`;
+    }
   };
 
   return (
@@ -300,11 +311,12 @@ function DescriptionCell({ value }: { value: string }) {
       </span>
       {showTooltip && createPortal(
         <div
+          ref={tooltipRef}
           className="desc-tooltip"
           style={{
             position: 'fixed',
-            top: tooltipPos.top,
-            left: tooltipPos.left,
+            top: 0,
+            left: 0,
             transform: 'translate(-50%, -100%)',
             zIndex: 10000,
             pointerEvents: 'none'
@@ -349,8 +361,11 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; value?: string; action: 'copy' | 'reset-layout'; openedAt: number } | null>(null);
   const gridApiRef = useRef<any>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const classifyAbortRef = useRef<AbortController | null>(null);
 
   // Classify tab state
   const [rawInput, setRawInput] = useState(
@@ -386,6 +401,11 @@ export default function App() {
     const lines = rawInput.split('\n').map(l => l.trim()).filter(Boolean);
     if (!lines.length) { setError('Please enter at least one item description.'); return; }
 
+    // Cancel any previous in-flight classify request
+    classifyAbortRef.current?.abort();
+    const controller = new AbortController();
+    classifyAbortRef.current = controller;
+
     const items = lines.map(l => ({ item_description: l }));
     setLoading(true);
     try {
@@ -393,12 +413,14 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items }),
+        signal: controller.signal,
       });
       if (!res.ok) throw new Error((await res.json()).detail);
       const data = await res.json();
       setResults(data.results);
       setSuccess(`✓ ${data.results.length} items classified successfully.`);
     } catch (e: unknown) {
+      if (e instanceof Error && e.name === 'AbortError') return; // Request was superseded
       setError(e instanceof Error ? e.message : 'Classification failed');
     } finally {
       setLoading(false);
@@ -408,12 +430,19 @@ export default function App() {
   const handleSearch = async () => {
     clearMessages();
     if (!searchQuery.trim()) { setError('Please enter a search query.'); return; }
+
+    // Cancel any previous in-flight search request
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: searchQuery, top_k: 50 }),
+        signal: controller.signal,
       });
       if (!res.ok) throw new Error((await res.json()).detail);
       const data = await res.json();
@@ -425,6 +454,7 @@ export default function App() {
       setSearchResults(filteredData);
       setSuccess(`Found ${filteredData.length} matches.`);
     } catch (e: unknown) {
+      if (e instanceof Error && e.name === 'AbortError') return; // Request was superseded
       setError(e instanceof Error ? e.message : 'Search failed');
     } finally {
       setLoading(false);
@@ -445,7 +475,7 @@ export default function App() {
 
   const cleanDesc = (val: any) => {
     if (!val) return '';
-    return String(val).replace(/[-:]/g, '').replace(/\s+/g, ' ').trim();
+    return String(val).replace(/[-:]/g, '').replace(/\s+/g, ' ').trim().replace(/^(.)/, c => c.toUpperCase());
   };
 
   const classifyColDefs: any[] = [
@@ -507,13 +537,10 @@ export default function App() {
       {/* Header */}
       <header className="header">
         <div className="header-inner">
-          <div className="header-brand">
-            <div className="brand-icon"><Cpu size={20} /></div>
-            <div>
-              <h1 className="brand-title">SaHS</h1>
-              <span className="brand-sub">Saudi HS Code Intelligence</span>
-            </div>
-          </div>
+          <a href="/" className="header-brand" aria-label="SaHS Home">
+            <img src="/SaHS_logo.png" alt="SaHS Logo" className="brand-logo" />
+            <span className="brand-sub">Saudi HS Code Intelligence</span>
+          </a>
           <div className="header-actions">
             <button
               className="btn btn-icon"
@@ -571,7 +598,7 @@ export default function App() {
               <div className="card-actions">
                 <button className="btn btn-primary" onClick={handleClassify} disabled={loading}>
                   {loading ? <Loader2 size={15} className="spin" /> : <Cpu size={15} />}
-                  {loading ? 'Classifying with Gemini...' : 'Classify with AI'}
+                  {loading ? 'Classifying...' : 'Classify'}
                 </button>
                 {results.length > 0 && (
                   <button className="btn btn-secondary" onClick={handleExport}>
@@ -716,8 +743,48 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        SaHS · Powered by Gemini 2.5 Flash + ChromaDB
+        SaHS · Powered by Gemini + ChromaDB · <button onClick={() => setShowDisclaimer(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', textDecoration: 'underline', padding: 0, font: 'inherit' }}>Disclaimer</button>
+        <a
+          href="https://github.com/donrami/SaHS"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="footer-github-btn"
+          title="View on GitHub"
+          aria-label="View SaHS on GitHub"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+          </svg>
+          GitHub
+        </a>
       </footer>
+
+      {/* Disclaimer Overlay */}
+      {showDisclaimer && (
+        <div className="modal-overlay" onClick={() => setShowDisclaimer(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="card-header" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="card-title"><AlertCircle size={16} /> Disclaimer</h2>
+              <button className="btn btn-icon" onClick={() => setShowDisclaimer(false)} aria-label="Close modal">
+                <span style={{ fontSize: '20px', lineHeight: 1 }}>&times;</span>
+              </button>
+            </div>
+            <p style={{ fontSize: '13px', lineHeight: 1.6, color: 'var(--text-secondary)' }}>
+              The HS code classifications and related information provided by this tool are generated by artificial intelligence and are intended for informational purposes only. While we strive for accuracy, these classifications may not be complete or legally binding. Formal bindings and definitive HS code classifications must be obtained directly from the relevant customs authorities. We disclaim any liability for customs clearance issues, duties, or penalties resulting from the use of this service.
+            </p>
+            <div style={{ marginTop: '24px', textAlign: 'right' }}>
+              <button className="btn btn-primary" onClick={() => setShowDisclaimer(false)}>I Understand</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Context Menu for Grid Cells */}
       {contextMenu && (
