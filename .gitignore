@@ -13,7 +13,6 @@ __pycache__/
 
 # Data
 chroma_hs_db/
-Tariff.xlsx
 *.csv
 *.log
 
