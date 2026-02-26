@@ -7,3 +7,4 @@ openpyxl
 pydantic
 python-multipart
 python-dotenv
+slowapi
