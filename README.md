@@ -9,6 +9,7 @@ SaHS is a Harmonized System (HS) Code Classification and Search Engine tailored 
 - **AI Classification**: Leverages Gemini 2.5 Flash to intelligently classify commercial invoice items to the correct Saudi HS code, returning both English and Arabic descriptions alongside ZATCA procedures.
 - **Customs & Tariffs Insight**: Displays hierarchy paths, duty rates, and required ZATCA procedures for each classified item.
 - **Batch Processing**: Allows uploading CSV invoices for automated mapping of all items at once.
+- **Open API Access**: A public, rate-limited API for developers to integrate SaHS classification into their own systems.
 
 ## Architecture
 
@@ -62,6 +63,16 @@ SaHS is a Harmonized System (HS) Code Classification and Search Engine tailored 
    ```bash
    npm run dev
    ```
+
+## Developer Tools & API
+
+SaHS now provides an **Open API** for external integrations.
+
+- **Production API**: `https://sahs-c7oy.onrender.com:8000`
+- **Interactive Documentation**:
+  - [Swagger UI](https://sahs-c7oy.onrender.com:8000/docs)
+  - [ReDoc](https://sahs-c7oy.onrender.com:8000/redoc)
+- **API Guide**: See [README_API.md](README_API.md) for detailed implementation instructions and cURL examples.
 
 ## Usage
 
