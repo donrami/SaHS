@@ -20,6 +20,7 @@ import {
   Sun,
   Moon,
 } from 'lucide-react';
+import { Analytics } from "@vercel/analytics/react";
 import './index.css';
 import './App.css';
 
@@ -837,6 +838,7 @@ export default function App() {
           </button>
         </div>
       )}
+      <Analytics />
     </div>
   );
 }
