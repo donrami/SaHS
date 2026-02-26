@@ -70,8 +70,8 @@ SaHS now provides an **Open API** for external integrations.
 
 - **Production API**: `https://sahs-c7oy.onrender.com:8000`
 - **Interactive Documentation**:
-  - [Swagger UI](https://sahs-c7oy.onrender.com:8000/docs)
-  - [ReDoc](https://sahs-c7oy.onrender.com:8000/redoc)
+  - [Swagger UI](https://sahs-c7oy.onrender.com/docs)
+  - [ReDoc](https://sahs-c7oy.onrender.com/redoc)
 - **API Guide**: See [README_API.md](README_API.md) for detailed implementation instructions and cURL examples.
 
 ## Usage
